@@ -1,13 +1,34 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Next, Param, Post, Put, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Next,
+  Param,
+  Post,
+  Put,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { type NextFunction, type Request, type Response } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators.js';
 import { AssetEditableDto, AssetEditableResponseDto, AssetFavoriteUpdateDto } from 'src/dtos/asset.dto.js';
 import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { ApiTag, Permission, RouteKey } from 'src/enum.js';
+import {
+  AssetRenameCheckDto,
+  AssetRenameCheckResponseDto,
+  AssetRenameDto,
+  AssetRenameResponseDto,
+} from 'src/gallery/dtos/asset-rename.dto.js';
 import { AssetSpacesDto, AssetSpacesResponseDto } from 'src/gallery/dtos/asset-spaces.dto.js';
 import { AssetImageAdjustDto, AssetImageAdjustResponseDto } from 'src/gallery/dtos/image-adjust.dto.js';
 import { AssetVideoTrimDto, AssetVideoTrimResponseDto } from 'src/gallery/dtos/video-trim.dto.js';
+import { AssetRenameService } from 'src/gallery/services/asset-rename.service.js';
 import { DataSaverVideoService } from 'src/gallery/services/data-saver-video.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
@@ -23,6 +44,7 @@ import { UUIDParamDto } from 'src/validation.js';
 export class GalleryAssetController {
   constructor(
     private service: GalleryAssetService,
+    private assetRename: AssetRenameService,
     private spatialScene: SpatialSceneService,
     private dataSaverVideo: DataSaverVideoService,
     private logger: LoggingRepository,
@@ -111,6 +133,38 @@ export class GalleryAssetController {
   })
   updateAssetFavorites(@Auth() auth: AuthDto, @Body() dto: AssetFavoriteUpdateDto): Promise<void> {
     return this.service.updateFavorites(auth, dto);
+  }
+
+  @Get(':id/rename-check')
+  @Authenticated({ permission: Permission.AssetUpdate })
+  @Endpoint({
+    summary: 'Check a new file name',
+    description:
+      'Reports what renaming the file on disk to this name would meet: free, an offline item the rename removes, a trashed item that needs confirming, or a file that blocks it. Owner only.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  checkAssetRename(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Query() dto: AssetRenameCheckDto,
+  ): Promise<AssetRenameCheckResponseDto> {
+    return this.assetRename.check(auth, id, dto);
+  }
+
+  @Put(':id/rename')
+  @Authenticated({ permission: Permission.AssetUpdate })
+  @Endpoint({
+    summary: 'Rename a file',
+    description:
+      'Changes the name Gallery shows. With renameOnDisk, an external library file is also renamed on disk with its sidecars, and a live photo is renamed as a pair. Owner only. Responds 409 when the new name is taken, the folder is read-only, or another file operation is running.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  renameAsset(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Body() dto: AssetRenameDto,
+  ): Promise<AssetRenameResponseDto> {
+    return this.assetRename.rename(auth, id, dto);
   }
 
   @Get(':id/trim')

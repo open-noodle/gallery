@@ -2,6 +2,7 @@ import request from 'supertest';
 import { AssetController } from 'src/controllers/asset.controller.js';
 import { controllers } from 'src/controllers/index.js';
 import { GalleryAssetController } from 'src/gallery/controllers/gallery-asset.controller.js';
+import { AssetRenameService } from 'src/gallery/services/asset-rename.service.js';
 import { DataSaverVideoService } from 'src/gallery/services/data-saver-video.service.js';
 import { GalleryAssetService } from 'src/gallery/services/gallery-asset.service.js';
 import { SpatialSceneService } from 'src/gallery/services/spatial-scene.service.js';
@@ -11,12 +12,14 @@ import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils.
 describe(GalleryAssetController.name, () => {
   let ctx: ControllerContext;
   const service = mockBaseService(GalleryAssetService);
+  const assetRename = mockBaseService(AssetRenameService);
   const spatialScene = mockBaseService(SpatialSceneService);
   const dataSaverVideo = mockBaseService(DataSaverVideoService);
 
   beforeAll(async () => {
     ctx = await controllerSetup(GalleryAssetController, [
       { provide: GalleryAssetService, useValue: service },
+      { provide: AssetRenameService, useValue: assetRename },
       { provide: SpatialSceneService, useValue: spatialScene },
       { provide: DataSaverVideoService, useValue: dataSaverVideo },
     ]);
@@ -25,6 +28,7 @@ describe(GalleryAssetController.name, () => {
 
   beforeEach(() => {
     service.resetAllMocks();
+    assetRename.resetAllMocks();
     spatialScene.resetAllMocks();
     dataSaverVideo.resetAllMocks();
     ctx.reset();
@@ -76,6 +80,58 @@ describe(GalleryAssetController.name, () => {
       const { status } = await request(ctx.getHttpServer()).post('/assets/spaces').send({ assetIds });
       expect(status).toBe(200);
       expect(service.getSpaces).toHaveBeenCalledWith(undefined, { assetIds });
+    });
+  });
+
+  describe('PUT /assets/:id/rename', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).put(`/assets/${factory.uuid()}/rename`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should require a valid id', async () => {
+      const { status } = await request(ctx.getHttpServer()).put('/assets/123/rename').send({ fileName: 'Beach' });
+      expect(status).toBe(400);
+      expect(assetRename.rename).not.toHaveBeenCalled();
+    });
+
+    it('should require a name', async () => {
+      for (const body of [{}, { fileName: '' }, { fileName: ' '.repeat(3) }, { fileName: 'x'.repeat(256) }]) {
+        const { status } = await request(ctx.getHttpServer()).put(`/assets/${factory.uuid()}/rename`).send(body);
+        expect(status).toBe(400);
+      }
+      expect(assetRename.rename).not.toHaveBeenCalled();
+    });
+
+    it('should rename the file', async () => {
+      const id = factory.uuid();
+      const { status } = await request(ctx.getHttpServer())
+        .put(`/assets/${id}/rename`)
+        .send({ fileName: ' Beach 2006-08 ', renameOnDisk: true });
+      expect(status).toBe(200);
+      expect(assetRename.rename).toHaveBeenCalledWith(undefined, id, { fileName: 'Beach 2006-08', renameOnDisk: true });
+    });
+  });
+
+  describe('GET /assets/:id/rename-check', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get(`/assets/${factory.uuid()}/rename-check`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should require a name', async () => {
+      const { status } = await request(ctx.getHttpServer()).get(`/assets/${factory.uuid()}/rename-check`);
+      expect(status).toBe(400);
+      expect(assetRename.check).not.toHaveBeenCalled();
+    });
+
+    it('should check the name', async () => {
+      const id = factory.uuid();
+      const { status } = await request(ctx.getHttpServer())
+        .get(`/assets/${id}/rename-check`)
+        .query({ fileName: 'Beach' });
+      expect(status).toBe(200);
+      expect(assetRename.check).toHaveBeenCalledWith(undefined, id, { fileName: 'Beach' });
     });
   });
 

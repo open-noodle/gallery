@@ -8,6 +8,7 @@ import { JOBS_LIBRARY_PAGINATION_SIZE } from 'src/constants.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import type { SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetFileType, AssetStatus, JobName, JobStatus } from 'src/enum.js';
+import { FileOperationRepository } from 'src/gallery/repositories/file-operation.repository.js';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository.js';
 import { AssetRepository } from 'src/repositories/asset.repository.js';
 import { CronRepository } from 'src/repositories/cron.repository.js';
@@ -47,7 +48,14 @@ class LibraryTestContext extends MediumTestContext<typeof LibraryService> {
   constructor(database: Kysely<DB>) {
     super(LibraryService, {
       database,
-      real: [AssetRepository, AssetJobRepository, CryptoRepository, LibraryRepository, StorageRepository],
+      real: [
+        AssetRepository,
+        AssetJobRepository,
+        CryptoRepository,
+        FileOperationRepository,
+        LibraryRepository,
+        StorageRepository,
+      ],
       mock: [
         CronRepository,
         DatabaseRepository,

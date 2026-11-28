@@ -6592,6 +6592,141 @@
         "x-immich-state": "Stable"
       }
     },
+    "/assets/{id}/rename": {
+      "put": {
+        "description": "Changes the name Gallery shows. With renameOnDisk, an external library file is also renamed on disk with its sidecars, and a live photo is renamed as a pair. Owner only. Responds 409 when the new name is taken, the folder is read-only, or another file operation is running.",
+        "operationId": "renameAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetRenameDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetRenameResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Rename a file",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.update",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/assets/{id}/rename-check": {
+      "get": {
+        "description": "Reports what renaming the file on disk to this name would meet: free, an offline item the rename removes, a trashed item that needs confirming, or a file that blocks it. Owner only.",
+        "operationId": "checkAssetRename",
+        "parameters": [
+          {
+            "name": "fileName",
+            "required": true,
+            "in": "query",
+            "description": "The new name, without its extension. The extension is kept and normalized, e.g. .JPEG becomes .jpg",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 255,
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetRenameCheckResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Check a new file name",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "asset.update",
+        "x-immich-state": "Beta"
+      }
+    },
     "/assets/{id}/thumbnail": {
       "get": {
         "description": "Retrieve the thumbnail image for the specified asset. Viewing the fullsize thumbnail might redirect to downloadAsset, which requires a different permission.",
@@ -32788,6 +32923,66 @@
         "enum": [
           "duplicate",
           "unsupported-format"
+        ],
+        "type": "string"
+      },
+      "AssetRenameCheckResponseDto": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/AssetRenameTargetState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
+      "AssetRenameDto": {
+        "properties": {
+          "deleteTrashed": {
+            "description": "Confirm deleting an item the user trashed that holds the new name on disk",
+            "type": "boolean"
+          },
+          "fileName": {
+            "description": "The new name, without its extension. The extension is kept and normalized, e.g. .JPEG becomes .jpg",
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "renameOnDisk": {
+            "description": "Also rename the file on disk, with its sidecar. Only for external library assets; otherwise only the name Gallery shows changes",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "fileName"
+        ],
+        "type": "object"
+      },
+      "AssetRenameResponseDto": {
+        "properties": {
+          "originalFileName": {
+            "description": "The name Gallery shows",
+            "type": "string"
+          },
+          "originalPath": {
+            "description": "The path of the original file",
+            "type": "string"
+          }
+        },
+        "required": [
+          "originalFileName",
+          "originalPath"
+        ],
+        "type": "object"
+      },
+      "AssetRenameTargetState": {
+        "description": "What a rename on disk meets at the new name: nothing, an offline item (removed by the rename), an item the user trashed (removed only when confirmed) or a file or live item (refused)",
+        "enum": [
+          "free",
+          "offline",
+          "trashed",
+          "exists"
         ],
         "type": "string"
       },

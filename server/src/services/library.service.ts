@@ -254,6 +254,7 @@ export class LibraryService extends BaseService {
 
   @OnJob({ name: JobName.LibrarySyncFiles, queue: QueueName.Library })
   async handleSyncFiles(job: JobOf<JobName.LibrarySyncFiles>): Promise<JobStatus> {
+    await this.fileOperationRepository.waitUntilIdle();
     const library = await this.libraryRepository.get(job.libraryId);
     // We need to check if the library still exists as it could have been deleted after the scan was queued
     if (!library) {
@@ -682,6 +683,7 @@ export class LibraryService extends BaseService {
   @OnJob({ name: JobName.LibraryRemoveAsset, queue: QueueName.Library })
   async handleAssetRemoval(job: JobOf<JobName.LibraryRemoveAsset>): Promise<JobStatus> {
     // This is only for handling file unlink events via the file watcher
+    await this.fileOperationRepository.waitUntilIdle();
     this.logger.verbose(`Deleting asset(s) ${job.paths} from library ${job.libraryId}`);
     for (const assetPath of job.paths) {
       const asset = await this.assetRepository.getByLibraryIdAndOriginalPath(job.libraryId, assetPath);

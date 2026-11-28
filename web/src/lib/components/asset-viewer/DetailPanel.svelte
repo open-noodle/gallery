@@ -9,6 +9,7 @@
   import AppearsInAlbum from '#lib/gallery/asset-viewer/AppearsInAlbum.svelte';
   import FilterValue from '#lib/gallery/asset-viewer/FilterValue.svelte';
   import MapProviderLinks from '#lib/gallery/asset-viewer/MapProviderLinks.svelte';
+  import RenameFileButton from '#lib/gallery/asset-viewer/RenameFileButton.svelte';
   import SpacePeopleSidePanel from '#lib/gallery/asset-viewer/SpacePeopleSidePanel.svelte';
   import { useAssetSpace } from '#lib/gallery/asset-viewer/asset-space.ts';
   import {
@@ -193,18 +194,21 @@
             >
               <span title={asset.originalFileName}>{truncateMiddle(asset.originalFileName)}</span>
             </FilterValue>
-            {#if asset.originalPath}
-              <IconButton
-                icon={mdiInformationOutline}
-                aria-label={$t('show_file_location')}
-                class="-my-1 shrink-0"
-                size="small"
-                shape="round"
-                color="secondary"
-                variant="ghost"
-                onclick={() => assetViewerManager.toggleAssetPath()}
-              />
-            {/if}
+            <div class="flex shrink-0">
+              {#if asset.originalPath}
+                <IconButton
+                  icon={mdiInformationOutline}
+                  aria-label={$t('show_file_location')}
+                  class="-my-1 shrink-0"
+                  size="small"
+                  shape="round"
+                  color="secondary"
+                  variant="ghost"
+                  onclick={() => assetViewerManager.toggleAssetPath()}
+                />
+              {/if}
+              <RenameFileButton {asset} {isOwner} />
+            </div>
           </div>
           {#if assetViewerManager.isShowAssetPath}
             <p class="pb-2 text-xs break-all opacity-50 hover:text-primary" transition:slide={{ duration: 250 }}>
