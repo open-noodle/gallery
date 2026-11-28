@@ -265,9 +265,20 @@ export const GalleryVideoFacesSchema = z
 
 export type VideoFacesConfig = z.infer<typeof GalleryVideoFacesSchema>;
 
+// Person covers picked by quality (specs/2026-11-21-person-cover-quality-design.md). On by default: the job only
+// replaces covers it knows were picked automatically.
+export const GalleryPersonCoverSchema = z
+  .object({
+    enabled: galleryConfigBool.describe(
+      'Choose person thumbnails automatically: a sharp, well-lit, recent face for new people, kept up to date. Never replaces a thumbnail chosen by hand.',
+    ),
+  })
+  .meta({ id: 'AdminConfigPersonCoverDto' });
+
 export const GalleryFacialRecognitionExtension = {
   suggestions: GalleryFaceSuggestionSchema,
   video: GalleryVideoFacesSchema,
+  covers: GalleryPersonCoverSchema,
 };
 
 export const GalleryClipExtension = {
@@ -297,6 +308,7 @@ export const galleryJobDefaults = {
   [QueueName.Classification]: { concurrency: 1 },
   [QueueName.QualityAnalysis]: { concurrency: 2 },
   [QueueName.SpatialScene]: { concurrency: 1 },
+  [QueueName.PersonCover]: { concurrency: 1 },
 };
 
 export const galleryMachineLearningDefaults = {
@@ -349,6 +361,7 @@ export const galleryMachineLearningDefaults = {
 export const galleryFacialRecognitionDefaults = {
   suggestions: galleryMachineLearningDefaults.faceSuggestions,
   video: galleryMachineLearningDefaults.videoFaces,
+  covers: { enabled: true },
 };
 
 export const galleryBackupDatabaseDefaults = {

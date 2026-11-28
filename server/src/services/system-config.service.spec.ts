@@ -81,6 +81,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     [QueueName.Classification]: { concurrency: 1 },
     [QueueName.QualityAnalysis]: { concurrency: 2 },
     [QueueName.SpatialScene]: { concurrency: 1 },
+    [QueueName.PersonCover]: { concurrency: 1 },
   },
   backup: {
     beta: false,
@@ -181,6 +182,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
         createPeople: true,
         minRecognitionScore: 0.75,
       },
+      covers: { enabled: true },
     },
     ocr: {
       enabled: true,

@@ -272,6 +272,15 @@ seed() {
     INSERT INTO asset_face (\"assetId\", \"personGroupId\") SELECT '$photo_a', \"personGroupId\" FROM p;
   " >/dev/null
 
+  # The human person's cover, hand-picked and recorded in person_cover: the revert drops the table and keeps the
+  # cover, a plain person.faceAssetId (specs/2026-11-21-person-cover-quality-design.md).
+  psql_q "
+    UPDATE person SET \"faceAssetId\" = f.id FROM asset_face f
+    WHERE person.name = 'Revert Human' AND f.\"personGroupId\" = person.\"personGroupId\";
+    INSERT INTO person_cover (\"personGroupId\", \"faceId\", source)
+    SELECT \"personGroupId\", \"faceAssetId\", 'manual' FROM person WHERE name = 'Revert Human';
+  " >/dev/null
+
   # A Spatial Scene depth map, also from the ML pipeline: the revert drops the row and leaves the file.
   psql_q "
     INSERT INTO asset_spatial_scene (\"assetId\", path, width, height, \"boundarySharpness\", \"edgeDensity\",
@@ -552,6 +561,10 @@ assert() {
   check assert 'pet person removed' "$(psql_q "SELECT count(*) FROM person WHERE name = 'Revert Pet'")" 0
   check assert 'pet faces removed' "$(psql_q "SELECT count(*) FROM asset_face WHERE \"assetId\" = '$PHOTO_B'")" 0
   check assert 'human face kept' "$(psql_q "SELECT count(*) FROM asset_face f JOIN person p ON p.\"personGroupId\" = f.\"personGroupId\" WHERE p.name = 'Revert Human'")" 1
+  check assert 'person cover tables removed' "$(psql_q "
+    SELECT to_regclass('public.person_cover') IS NULL AND to_regclass('public.shared_space_person_cover') IS NULL")" t
+  check assert 'hand-picked cover kept' "$(psql_q "
+    SELECT count(*) FROM person p JOIN asset_face f ON f.id = p.\"faceAssetId\" WHERE p.name = 'Revert Human'")" 1
   check assert 'pet absent from people API' "$(api GET /people "$owner" | jq '[.people[] | select(.name == "Revert Pet")] | length')" 0
 
   check assert 'rule memory removed' "$(psql_q "SELECT count(*) FROM memory WHERE type = 'rule'")" 0

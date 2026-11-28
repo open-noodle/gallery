@@ -215,6 +215,7 @@ export class GalleryPeopleService extends BaseService {
       personGroupId: id,
       faceAssetId: face.id,
     });
+    await this.personCoverRepository.recordHandPick(id, face.id);
     if (current.identityId) {
       await this.faceIdentityRepository.updateRepresentativeFace({
         identityId: current.identityId,

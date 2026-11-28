@@ -2633,6 +2633,8 @@ export class SharedSpaceService extends BaseService {
         representativeFaceSource: 'auto',
         representativeFaceId,
       });
+      // Back to automatic: let the cover job pick for it (specs/2026-11-21-person-cover-quality-design.md).
+      await this.jobRepository.queue({ name: JobName.SpacePersonCover, data: { id: person.id } });
       const alias = await this.sharedSpaceRepository.getAlias(person.id, auth.user.id);
       return this.mapSpacePerson(updated, alias?.alias ?? null);
     }
@@ -2650,6 +2652,7 @@ export class SharedSpaceService extends BaseService {
       representativeFaceId: face.id,
       representativeFaceSource: 'manual',
     });
+    await this.personCoverRepository.recordSpaceHandPick(person.id, face.id);
     if (person.identityId) {
       await this.faceIdentityRepository.updateRepresentativeFace({
         identityId: person.identityId,

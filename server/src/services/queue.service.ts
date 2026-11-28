@@ -284,6 +284,10 @@ export class QueueService extends BaseService {
         return this.jobRepository.queue({ name: JobName.SpatialSceneQueueAll, data: { force } });
       }
 
+      case QueueName.PersonCover: {
+        return this.jobRepository.queue({ name: JobName.PersonCoverQueueAll, data: { force } });
+      }
+
       case QueueName.PeopleBackfill: {
         return this.jobRepository.queue({ name: JobName.FaceIdentityBackfill, data: {} });
       }

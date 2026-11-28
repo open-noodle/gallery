@@ -703,6 +703,8 @@ DROP TABLE IF EXISTS "shared_space_member" CASCADE;
 DROP TABLE IF EXISTS "shared_space" CASCADE;
 
 -- Face identities
+DROP TABLE IF EXISTS "person_cover" CASCADE;
+DROP TABLE IF EXISTS "shared_space_person_cover" CASCADE;
 DROP TABLE IF EXISTS "person_identity" CASCADE;
 DROP TABLE IF EXISTS "person_pet" CASCADE;
 DROP TABLE IF EXISTS "person_group_split" CASCADE;
@@ -856,12 +858,14 @@ UPDATE "system_metadata"
      #- '{job,classification}'
      #- '{job,qualityAnalysis}'
      #- '{job,spatialScene}'
+     #- '{job,personCover}'
      #- '{machineLearning,clip,maxDistance}'
      #- '{machineLearning,petDetection}'
      #- '{machineLearning,petRecognition}'
      #- '{machineLearning,facialRecognition,suggestions}'
      #- '{machineLearning,facialRecognition,suggestionMaxDistance}'
      #- '{machineLearning,facialRecognition,video}'
+     #- '{machineLearning,facialRecognition,covers}'
      #- '{machineLearning,spatialScene}'
      #- '{nightlyTasks,clusterNewPets}'
      #- '{server,mergePeopleAcrossOwners}'
@@ -1241,6 +1245,7 @@ DELETE FROM "kysely_migrations"
   '1799900000000-AddAssetDataSaverVideoTable',
   '1800000000000-AddAssetFaceVideoFrameTable',
   '1800100000000-AddVideoPetsSampledAt',
+  '1800400000000-AddPersonCoverTables',
   -- Pre-rename name, recorded by builds from before the ledger split: this migration was
   -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
   -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
@@ -1354,6 +1359,7 @@ BEGIN
        'asset_spatial_scene',
        'asset_data_saver_video',
        'asset_face_video_frame',
+       'person_cover', 'shared_space_person_cover',
        'person_identity',
        'person_pet',
        'person_group_split', 'person_group_split_share', 'person_group_split_person',

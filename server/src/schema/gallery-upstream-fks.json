@@ -69,6 +69,7 @@
         "face_person_verdict_personGroupId_fkey",
         "face_repair_decline_personGroupId_fkey",
         "face_repair_decline_suspectedOwnerId_fkey",
+        "person_cover_personGroupId_fkey",
         "person_group_split_originalGroupId_fkey",
         "person_group_split_person_personGroupId_fkey",
         "person_group_split_splitGroupId_fkey",

@@ -16,6 +16,7 @@ import {
 } from 'src/dtos/person.dto.js';
 import { ApiTag, Permission } from 'src/enum.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
+import { PersonCoverService } from 'src/gallery/services/person-cover.service.js';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { sendFile } from 'src/utils/file.js';
@@ -28,6 +29,7 @@ import { UUIDParamDto } from 'src/validation.js';
 export class GalleryPeopleController {
   constructor(
     private service: GalleryPeopleService,
+    private personCoverService: PersonCoverService,
     private logger: LoggingRepository,
   ) {
     this.logger.setContext(GalleryPeopleController.name);
@@ -128,5 +130,21 @@ export class GalleryPeopleController {
     @Body() dto: RepresentativeFaceUpdateDto,
   ): Promise<PersonResponseDto> {
     return this.service.updateRepresentativeFace(auth, id, dto);
+  }
+
+  @Post(':id/representative-face/auto')
+  @Authenticated({ permission: Permission.PersonUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Choose representative face automatically',
+    description:
+      "Pick the person's thumbnail from their photos by sharpness, exposure, size, typicality and date. The pick is recorded as automatic, so the person cover job may update it later.",
+    history: new HistoryBuilder().added('v3.4.2').alpha('v3.4.2'),
+  })
+  chooseRepresentativeFaceAutomatically(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+  ): Promise<PersonResponseDto> {
+    return this.personCoverService.chooseAutomatically(auth, id);
   }
 }

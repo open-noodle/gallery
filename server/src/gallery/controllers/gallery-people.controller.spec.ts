@@ -1,8 +1,10 @@
 import request from 'supertest';
 import { controllers } from 'src/controllers/index.js';
 import { PersonController } from 'src/controllers/person.controller.js';
+import { Permission } from 'src/enum.js';
 import { GalleryPeopleController } from 'src/gallery/controllers/gallery-people.controller.js';
 import { GalleryPeopleService } from 'src/gallery/services/gallery-people.service.js';
+import { PersonCoverService } from 'src/gallery/services/person-cover.service.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { errorDto } from 'test/medium/responses.js';
 import { factory } from 'test/small.factory.js';
@@ -11,10 +13,12 @@ import { ControllerContext, automock, controllerSetup, mockBaseService } from 't
 describe(GalleryPeopleController.name, () => {
   let ctx: ControllerContext;
   const service = mockBaseService(GalleryPeopleService);
+  const personCoverService = mockBaseService(PersonCoverService);
 
   beforeAll(async () => {
     ctx = await controllerSetup(GalleryPeopleController, [
       { provide: GalleryPeopleService, useValue: service },
+      { provide: PersonCoverService, useValue: personCoverService },
       { provide: LoggingRepository, useValue: automock(LoggingRepository, { strict: false }) },
     ]);
     return () => ctx.close();
@@ -22,6 +26,7 @@ describe(GalleryPeopleController.name, () => {
 
   beforeEach(() => {
     service.resetAllMocks();
+    personCoverService.resetAllMocks();
     ctx.reset();
   });
 
@@ -188,6 +193,41 @@ describe(GalleryPeopleController.name, () => {
         page: 1,
         size: 25,
       });
+    });
+  });
+
+  describe('POST /people/:id/representative-face/auto', () => {
+    const id = '00000000-0000-4000-8000-000000000001';
+
+    it('requires the owner-only person.update permission', async () => {
+      await request(ctx.getHttpServer()).post(`/people/${id}/representative-face/auto`);
+
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.PersonUpdate }),
+        }),
+      );
+    });
+
+    it('requires a uuid', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .post('/people/invalid/representative-face/auto')
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(personCoverService.chooseAutomatically).not.toHaveBeenCalled();
+    });
+
+    it('chooses the cover and answers 200 with the person', async () => {
+      personCoverService.chooseAutomatically.mockResolvedValue({ id } as never);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .post(`/people/${id}/representative-face/auto`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(body).toEqual({ id });
+      expect(personCoverService.chooseAutomatically).toHaveBeenCalledWith(undefined, id);
     });
   });
 });

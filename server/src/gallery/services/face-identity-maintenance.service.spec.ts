@@ -277,6 +277,15 @@ describe(FaceIdentityMaintenanceService.name, () => {
   });
 
   describe('handleFaceIdentityMaintenanceAfterRecognition', () => {
+    it('queues a Missing person cover run once recognition has drained, even while a backfill runs', async () => {
+      mocks.job.getJobCounts.mockResolvedValue(recognitionCounts({ active: 1 }));
+      mocks.job.searchJobs.mockResolvedValue([{ name: JobName.FaceIdentityBackfill } as never]);
+
+      await sut.handleFaceIdentityMaintenanceAfterRecognition({});
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonCoverQueueAll, data: { force: false } });
+    });
+
     it('queues FaceIdentityBackfill when FacialRecognition queue is drained', async () => {
       mocks.job.getJobCounts.mockResolvedValue({
         active: 1,
