@@ -3,6 +3,14 @@
 // see web/src/lib/components/shared-components/search-bar/DORMANT.md before touching either.
 // Do not import `$lib/managers/search-manager.svelte` — that is upstream's dormant manager.
 import { createFilterState, type FilterState } from '#lib/components/filter-panel/filter-panel.ts';
+import {
+  SEARCH_MODES,
+  buildFullPathSearchTerms,
+  buildFullPathSearchUrl,
+  parsePaletteDraft,
+  parsePaletteScope,
+  type PaletteSearchMode,
+} from '#lib/gallery/search/full-path-search.ts';
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
 import { Route } from '#lib/route.ts';
@@ -62,7 +70,7 @@ import { get } from 'svelte/store';
 import { browser } from '$app/env';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
-import { parseScope, personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
+import { personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
 import { commandContextManager } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch, type CommandItem } from './command-items';
 import { NAVIGATION_ITEMS, isAlmostExactNavMatch, type NavigationItem } from './navigation-items';
@@ -70,7 +78,7 @@ import { NAVIGATION_ITEMS, isAlmostExactNavMatch, type NavigationItem } from './
 // SvelteKit 3's page.url is read-only; the URL helpers take a URL. This is a throwaway copy, not reactive state.
 const currentPageUrl = () => new URL(page.url.href);
 
-export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
+export type SearchMode = PaletteSearchMode;
 export type SearchPresentation = 'modal' | 'dropdown';
 
 export type ProviderStatus<T = unknown> =
@@ -143,7 +151,7 @@ function selectedChoiceFromLiveChoice(
 type TopSearchMatch = { id: 'top-search'; query: string; rawQuery: string };
 type SearchBelowTopMatch = { id: 'top-search-below'; query: string; rawQuery: string };
 
-const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
+const VALID_MODES: ReadonlySet<SearchMode> = new Set(SEARCH_MODES);
 // Slice size for the albums section. Kept as a named constant so the buildProviders
 // `topN: 5` and the runAlbums slice cannot drift apart silently.
 const ALBUMS_TOP_N = 5;
@@ -318,7 +326,7 @@ export class GlobalSearchManager {
   query = $state('');
   searchSortOrder = $state<SearchablePageSortOrder>('relevance');
   mode = $state<SearchMode>(loadSearchQueryType());
-  parsedQuery = $derived<ParsedQuery>(parseScope(this.query));
+  parsedQuery = $derived<ParsedQuery>(parsePaletteScope(this.query, this.mode));
   scope = $derived<Scope>(this.parsedQuery.scope);
   payload = $derived<string>(this.parsedQuery.payload);
   typedSearchDisplayTokens = $state<TypedSearchDisplayToken[]>([]);
@@ -558,7 +566,7 @@ export class GlobalSearchManager {
     payload: string,
     scope: Scope,
   ): { commands: CommandItem[]; navigation: NavigationItem[] } {
-    if (scope !== 'all' && scope !== 'nav') {
+    if (this.mode === 'fullPath' || (scope !== 'all' && scope !== 'nav')) {
       return { commands: [], navigation: [] };
     }
     if (scope === 'all' && payload === '') {
@@ -1420,7 +1428,7 @@ export class GlobalSearchManager {
   }
 
   parseTypedSearchDraft(text = this.query) {
-    const parsed = parseTypedSearch(text, { mode: 'draft' });
+    const parsed = parsePaletteDraft(text, this.mode);
     this.applyTypedSearchParsedState(parsed);
     this.updateActiveTypedSearchToken();
     return parsed;
@@ -1572,7 +1580,7 @@ export class GlobalSearchManager {
       this.scheduleLiveTypedSearchSuggestions();
       return;
     }
-    const parsed = parseTypedSearch(this.query, { mode: 'draft' });
+    const parsed = parsePaletteDraft(this.query, this.mode);
     const token = getActiveTypedSearchToken(parsed, this.typedSearchCaret);
     const previousToken = this.activeTypedSearchToken;
     const nextToken = isLiveTypedSearchToken(token) && token.issue?.code !== 'unterminated-quote' ? token : undefined;
@@ -1702,8 +1710,8 @@ export class GlobalSearchManager {
   /**
   Navigate the current searchable page (or `/photos`) to a full result set filtered by the
   active field-search mode. The current filters are preserved and the one text field is
-  AND-ed in, so "See all" / Enter from a field mode lands on the filterable timeline rather
-  than dropping the mode into a smart `?q=` search.
+  AND-ed in. "See all" / Enter lands on the filterable timeline, or on metadata results
+  for full paths, which the timeline API cannot filter.
   */
   private navigateToFieldResults(text: string, mode: SearchMode): void {
     const trimmed = text.trim();
@@ -1712,6 +1720,10 @@ export class GlobalSearchManager {
     }
     if (mode === 'smart') {
       // Unreachable: navigateToFieldResults is only called for field modes.
+      return;
+    }
+    if (mode === 'fullPath') {
+      void goto(buildFullPathSearchUrl(trimmed, currentPageUrl(), this.searchablePageFiltersProvider?.()));
       return;
     }
     this.navigateToFilteredResults({
@@ -1851,9 +1863,9 @@ export class GlobalSearchManager {
       return;
     }
 
-    // Field-search modes (filename / description / OCR) bypass typed-search parsing and route to
-    // the filtered timeline so the selected mode is honoured instead of becoming a smart search.
-    if (['metadata', 'description', 'ocr'].includes(this.mode)) {
+    // Field-search modes bypass typed-search parsing and keep their selected predicate
+    // through navigation (timeline filters, or metadata results for full paths).
+    if (['metadata', 'description', 'ocr', 'fullPath'].includes(this.mode)) {
       addEntry({
         kind: 'query',
         id: `query:${trimmed.toLowerCase()}`,
@@ -2148,6 +2160,7 @@ export class GlobalSearchManager {
     if (newMode === this.mode) {
       return;
     }
+    const previousMode = this.mode;
     this.mode = newMode;
     if (browser) {
       try {
@@ -2155,6 +2168,11 @@ export class GlobalSearchManager {
       } catch {
         // ignore — privacy mode
       }
+    }
+
+    if (newMode === 'fullPath' || previousMode === 'fullPath') {
+      this.setQuery(this.query, true);
+      return;
     }
 
     // Scope short-circuit: photos isn't dispatched under any prefix, so a mode
@@ -2290,7 +2308,7 @@ export class GlobalSearchManager {
     // global-search.svelte gates on `scope === 'all'`. Computing a match under
     // `>` / `@` / `#` / `/` serves no purpose and (for commands) would dedup
     // the promoted item out of its own section, leaving nothing visible.
-    if (this.scope !== 'all') {
+    if (this.scope !== 'all' || this.mode === 'fullPath') {
       return null;
     }
     if (this.typedSearchDisplayTokens.length > 0) {
@@ -2366,7 +2384,7 @@ export class GlobalSearchManager {
     // See the scope gate in topNavigationMatch. Under `>` scope the command
     // section itself lists matching commands — promoting + deduping here would
     // make the section render empty, so only promote under unscoped 'all'.
-    if (this.scope !== 'all') {
+    if (this.scope !== 'all' || this.mode === 'fullPath') {
       return null;
     }
     if (this.typedSearchDisplayTokens.length > 0) {
@@ -2468,12 +2486,12 @@ export class GlobalSearchManager {
     return scopeCue || counts;
   });
 
-  setQuery(text: string) {
+  setQuery(text: string, force = false) {
     // In production setQuery only fires through global-search.svelte's $effect, which
     // is only mounted while the palette is open. Calling this method on a closed
     // manager is safe — sections mutate but no side effects escape — but should be
     // considered an implementation detail of the component, not a public entry point.
-    if (this.query === text) {
+    if (this.query === text && !force) {
       return;
     }
     if (this.pendingConfirmId !== null) {
@@ -2886,6 +2904,8 @@ export class GlobalSearchManager {
             ...(mode === 'metadata' && { originalFileName: query }),
             ...(mode === 'description' && { description: query }),
             ...(mode === 'ocr' && { ocr: query }),
+            ...(mode === 'fullPath' &&
+              buildFullPathSearchTerms(query, currentPageUrl(), this.searchablePageFiltersProvider?.())),
           };
           const response = await searchAssets({ metadataSearchDto }, { signal });
           const items = response.assets.items;

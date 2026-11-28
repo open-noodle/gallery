@@ -527,7 +527,42 @@ where
     "shared_link"."type" = $1
     or "album"."id" is not null
   )
-  and "shared_link"."key" = $2
+  and (
+    "shared_link"."albumId" is null
+    or "shared_link_space"."spaceId" is null
+    or exists (
+      select
+        1 as "exists"
+      from
+        "album_user"
+      where
+        "album_user"."albumId" = "shared_link"."albumId"
+        and "album_user"."userId" = "shared_link"."userId"
+        and "album_user"."role" in ($2, $3)
+    )
+    or (
+      exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."spaceId" = "shared_link_space"."spaceId"
+          and "shared_space_member"."userId" = "shared_link"."userId"
+          and "shared_space_member"."role" in ($4, $5)
+      )
+      and exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_album"
+        where
+          "shared_space_album"."albumId" = "shared_link"."albumId"
+          and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
+      )
+    )
+  )
+  and "shared_link"."key" = $6
 
 -- SharedLinkRepository.getBySlug
 select
@@ -568,7 +603,42 @@ where
     "shared_link"."type" = $1
     or "album"."id" is not null
   )
-  and "shared_link"."slug" = $2
+  and (
+    "shared_link"."albumId" is null
+    or "shared_link_space"."spaceId" is null
+    or exists (
+      select
+        1 as "exists"
+      from
+        "album_user"
+      where
+        "album_user"."albumId" = "shared_link"."albumId"
+        and "album_user"."userId" = "shared_link"."userId"
+        and "album_user"."role" in ($2, $3)
+    )
+    or (
+      exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."spaceId" = "shared_link_space"."spaceId"
+          and "shared_space_member"."userId" = "shared_link"."userId"
+          and "shared_space_member"."role" in ($4, $5)
+      )
+      and exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_album"
+        where
+          "shared_space_album"."albumId" = "shared_link"."albumId"
+          and "shared_space_album"."spaceId" = "shared_link_space"."spaceId"
+      )
+    )
+  )
+  and "shared_link"."slug" = $6
 
 -- SharedLinkRepository.getSharedLinks
 select

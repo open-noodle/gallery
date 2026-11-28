@@ -1,6 +1,9 @@
 import { UserAdmin } from 'src/database.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import type { GalleryRepositories } from 'src/gallery/repositories/index.js';
+import type { IAssetEditJob } from 'src/gallery/types.js';
+import { assetEditJobData, sendAssetEditReady } from 'src/gallery/utils/asset-edit-ready.js';
 import type { AssetUpdateRepositories } from 'src/gallery/utils/asset-update-hooks.js';
 import { BackendMediaServer } from 'src/gallery/utils/backend-media-server.js';
 import { computePhysicalUsage } from 'src/gallery/utils/storage-usage.js';
@@ -17,6 +20,7 @@ import type { MediaRepository } from 'src/repositories/media.repository.js';
 import type { PersonRepository } from 'src/repositories/person.repository.js';
 import type { StorageRepository } from 'src/repositories/storage.repository.js';
 import type { UserRepository } from 'src/repositories/user.repository.js';
+import type { ClientEventMap, WebsocketRepository } from 'src/repositories/websocket.repository.js';
 import { FaceAssignmentService } from 'src/services/face-assignment.service.js';
 import { IdentityMergePropagationService } from 'src/services/identity-merge-propagation.service.js';
 import { ViewerScopeArgs, ViewerSurface, resolveViewerScope } from 'src/utils/viewer-scope.js';
@@ -40,8 +44,26 @@ export abstract class GalleryBaseService {
   protected abstract personRepository: PersonRepository;
   protected abstract storageRepository: StorageRepository;
   protected abstract userRepository: UserRepository;
+  protected abstract websocketRepository: WebsocketRepository;
   protected abstract galleryRepositories: GalleryRepositories;
   abstract getConfig(options: { withCache: boolean }): Promise<SystemConfig>;
+
+  protected assetEditJobData(auth: AuthDto, id: string): Promise<IAssetEditJob> {
+    return assetEditJobData(this.accessRepository, auth, id);
+  }
+
+  protected notifyAssetEditReady(job: IAssetEditJob, data: ClientEventMap['AssetEditReadyV2'][0]): Promise<void> {
+    return sendAssetEditReady(
+      {
+        access: this.accessRepository,
+        asset: this.assetRepository,
+        user: this.userRepository,
+        websocket: this.websocketRepository,
+      },
+      job,
+      data,
+    );
+  }
 
   // Copied from `galleryRepositories` by initGallery()
   declare protected assetFavoriteRepository: GalleryRepositories['assetFavoriteRepository'];

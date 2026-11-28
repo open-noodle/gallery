@@ -281,10 +281,9 @@ export class SharedSpaceService extends BaseService {
     // Spaces stay one at a time so a user in many spaces does not take over the connection pool; the reads for
     // one space are independent, so they run side by side, as in get() (#817).
     for (const space of spaces) {
-      const [members, assetCount, recentAssets, albumCount, membership, links] = await Promise.all([
+      const [members, { count: assetCount, recentAssets }, albumCount, membership, links] = await Promise.all([
         this.sharedSpaceRepository.getMembers(space.id),
-        this.sharedSpaceRepository.getAssetCount(space.id),
-        this.sharedSpaceRepository.getRecentAssets(space.id),
+        this.sharedSpaceRepository.getAssetSummary(space.id),
         this.sharedSpaceRepository.getLinkedAlbumCount(space.id),
         // Recency badge data
         this.sharedSpaceRepository.getMember(space.id, auth.user.id),
@@ -355,12 +354,11 @@ export class SharedSpaceService extends BaseService {
   async get(auth: AuthDto, id: string): Promise<SharedSpaceResponseDto> {
     const membership = await this.requireMembership(auth, id);
 
-    // Independent reads; the two asset scans dominate, so run them side by side.
-    const [space, members, assetCount, recentAssets, newAssetCount] = await Promise.all([
+    // Independent reads; the asset summary dominates, so run them side by side.
+    const [space, members, { count: assetCount, recentAssets }, newAssetCount] = await Promise.all([
       this.sharedSpaceRepository.getById(id),
       this.sharedSpaceRepository.getMembers(id),
-      this.sharedSpaceRepository.getAssetCount(id),
-      this.sharedSpaceRepository.getRecentAssets(id),
+      this.sharedSpaceRepository.getAssetSummary(id),
       membership.lastViewedAt ? this.sharedSpaceRepository.getNewAssetCount(id, membership.lastViewedAt) : 0,
     ]);
     if (!space) {
@@ -984,14 +982,15 @@ export class SharedSpaceService extends BaseService {
     // stack-collapsed timeline (#751). Auto-expanded siblings are restricted to
     // space-eligible visibility so we never pull a Hidden/Locked frame in, and
     // access is checked on the full expanded set so we never contribute a
-    // sibling the actor cannot read.
-    const assetIds = await this.expandStackAssetIds(dto.assetIds, visibleSpaceAssetVisibilities);
+    // sibling the actor cannot share. Inaccessible automatic siblings are omitted;
+    // every explicitly requested id must still pass (#1330).
+    const expandedAssetIds = await this.expandStackAssetIds(dto.assetIds, visibleSpaceAssetVisibilities);
     // rbac-2: AssetRead's space arm (checkSpaceAccess) includes an un-role-gated shared_space_album branch,
     // so a space Viewer of a space linking album X could read X's assets and re-add them as DIRECT assets
     // into a space they own — gaining edit access over the owner's assets via checkSpaceEditAccess. AssetShare
     // (owner ∪ partner only, no album/space arm) closes the read→re-share→write escalation. Upstream's AssetShare now
     // also admits album members (immich-32609), so this checks the narrower pre-32609 rule explicitly.
-    await requireSpaceShareAccess(this.accessRepository, auth, assetIds);
+    const assetIds = await requireSpaceShareAccess(this.accessRepository, auth, dto.assetIds, expandedAssetIds);
     const inserted = await this.sharedSpaceRepository.addAssets(
       assetIds.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),
     );

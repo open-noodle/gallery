@@ -3,13 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/gallery/networking/endpoint_input.dart';
+import 'package:immich_mobile/gallery/networking/external_endpoints.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/models/auth/auxilary_endpoint.model.dart';
-import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
-import 'package:immich_mobile/widgets/settings/networking_settings/endpoint_input.dart';
 
 class ExternalNetworkPreference extends HookConsumerWidget {
   const ExternalNetworkPreference({super.key, required this.enabled});
@@ -19,26 +18,12 @@ class ExternalNetworkPreference extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final entries = useState([const AuxilaryEndpoint(url: '', status: AuxCheckStatus.unknown)]);
-    final canSave = useState(false);
-
-    Future<void> saveEndpointList() {
-      canSave.value = entries.value.every((e) => e.status == AuxCheckStatus.valid);
-
-      final urls = entries.value
-          .where((e) => e.status == AuxCheckStatus.valid && e.url.isNotEmpty)
-          .map((e) => e.url)
-          .toList();
-
-      return ref.read(settingsProvider).write(SettingsKey.networkExternalEndpointList, urls);
-    }
+    Future<void> saveEndpointList() => saveExternalEndpointList(ref, entries.value);
 
     Future<void> updateValidationStatus(String url, int index, AuxCheckStatus status) async {
       entries.value[index] = entries.value[index].copyWith(url: url, status: status);
 
       await saveEndpointList();
-      if (status == AuxCheckStatus.valid && context.mounted) {
-        await ref.read(apiServiceProvider).updateHeaders();
-      }
     }
 
     void handleReorder(int oldIndex, int newIndex) {
@@ -76,7 +61,8 @@ class ExternalNetworkPreference extends HookConsumerWidget {
         return null;
       }
 
-      entries.value = urls.map((url) => AuxilaryEndpoint(url: url, status: .valid)).toList();
+      // gallery-fork: a saved URL may never have passed its check (#1220), so it loads unchecked.
+      entries.value = urls.map((url) => AuxilaryEndpoint(url: url, status: .unknown)).toList();
       return null;
     }, const []);
 
@@ -117,7 +103,7 @@ class ExternalNetworkPreference extends HookConsumerWidget {
                     itemCount: entries.value.length,
                     onReorderItem: handleReorder,
                     itemBuilder: (context, index) {
-                      return EndpointInput(
+                      return GalleryEndpointInput(
                         key: Key(index.toString()),
                         index: index,
                         initialValue: entries.value[index],

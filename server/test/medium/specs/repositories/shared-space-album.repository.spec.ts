@@ -382,6 +382,9 @@ const seedPersonOnSpaceLinkedAlbum = async (ctx: ReturnType<typeof setup>['ctx']
   const { user: editor } = await ctx.newUser();
   const { user: viewer } = await ctx.newUser();
   const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  // The space's creator is its Owner member, as the app records it. An Editor may only edit a person whose owner is
+  // in the space (representative-face-owner-membership-matrix).
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: editor.id, role: 'editor' });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: 'viewer' });
   const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'PersonEditAlbum' });
@@ -427,8 +430,8 @@ describe('AccessRepository.galleryPerson.checkSharedSpaceEditAccess — album le
   });
 });
 
-describe('getRecentAssets and getNewAssetCount — album leg (C2 consistency)', () => {
-  it('album-only space: getRecentAssets returns album image assets, getNewAssetCount counts them, both equal getAssetCount', async () => {
+describe('getAssetSummary and getNewAssetCount — album leg (C2 consistency)', () => {
+  it('album-only space: getAssetSummary returns album image assets, getNewAssetCount counts them, both equal getAssetCount', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: user.id });
@@ -446,7 +449,7 @@ describe('getRecentAssets and getNewAssetCount — album leg (C2 consistency)', 
 
     await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: user.id });
 
-    const recentAssets = await sut.getRecentAssets(space.id);
+    const { recentAssets } = await sut.getAssetSummary(space.id);
     expect(recentAssets).toHaveLength(3);
     const recentIds = recentAssets.map((a) => a.id);
     expect(recentIds).toContain(a1.id);

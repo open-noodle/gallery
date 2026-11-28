@@ -892,6 +892,7 @@ where
       inner join "asset" on "asset"."id" = "asset_face"."assetId"
       and "asset"."deletedAt" is null
       and "asset"."visibility" in ($2, $3)
+      inner join "shared_space_member" as "owner_membership" on "owner_membership"."userId" = "person"."ownerId"
     where
       "asset_face"."personGroupId" = "person"."personGroupId"
       and "asset_face"."deletedAt" is null
@@ -907,6 +908,7 @@ where
             "shared_space_member"."userId" = $4::uuid
             and "shared_space_member"."role" in ($5, $6)
             and "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = "owner_membership"."spaceId"
         )
         or exists (
           select
@@ -918,6 +920,7 @@ where
             "shared_space_member"."userId" = $7::uuid
             and "shared_space_member"."role" in ($8, $9)
             and "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = "owner_membership"."spaceId"
         )
         or (
           exists (
@@ -933,6 +936,7 @@ where
               "shared_space_member"."userId" = $10::uuid
               and "shared_space_member"."role" in ($11, $12)
               and "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = "owner_membership"."spaceId"
           )
           or exists (
             select
@@ -948,6 +952,7 @@ where
               "shared_space_member"."userId" = $13::uuid
               and "shared_space_member"."role" in ($14, $15)
               and "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = "owner_membership"."spaceId"
           )
         )
       )

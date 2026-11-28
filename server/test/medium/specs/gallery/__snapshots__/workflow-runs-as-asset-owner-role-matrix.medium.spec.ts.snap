@@ -1,0 +1,48 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`asset workflows run only on their own owner’s assets > outcome grid 1`] = `
+{
+  "admin non-member": {
+    "add to album": "not tagged, false",
+    "add to space": "not tagged, false",
+    "archive": "not tagged, "timeline"",
+    "favorite": "not tagged, []",
+    "lock": "not tagged, "timeline"",
+  },
+  "asset owner": {
+    "add to album": "tagged, true",
+    "add to space": "tagged, true",
+    "archive": "tagged, "archive"",
+    "favorite": "tagged, ["asset owner"]",
+    "lock": "tagged, "locked"",
+  },
+  "non-member": {
+    "add to album": "not tagged, false",
+    "add to space": "not tagged, false",
+    "archive": "not tagged, "timeline"",
+    "favorite": "not tagged, []",
+    "lock": "not tagged, "timeline"",
+  },
+  "space editor": {
+    "add to album": "tagged, false",
+    "add to space": "tagged, false",
+    "archive": "tagged, "timeline"",
+    "favorite": "tagged, []",
+    "lock": "tagged, "timeline"",
+  },
+  "space owner": {
+    "add to album": "tagged, false",
+    "add to space": "tagged, false",
+    "archive": "tagged, "timeline"",
+    "favorite": "tagged, []",
+    "lock": "tagged, "timeline"",
+  },
+  "space viewer": {
+    "add to album": "not tagged, false",
+    "add to space": "not tagged, false",
+    "archive": "not tagged, "timeline"",
+    "favorite": "not tagged, []",
+    "lock": "not tagged, "timeline"",
+  },
+}
+`;

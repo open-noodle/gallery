@@ -1,10 +1,11 @@
 <script lang="ts">
   import { clickOutside } from '#lib/actions/click-outside.ts';
   import SearchModeControl from '#lib/components/global-search/search-mode-control.svelte';
+  import { nextSearchMode } from '#lib/gallery/search/full-path-search.ts';
   import { isApplePlatform as isApplePlatformFor, searchHotkeyLabel } from '#lib/gallery/search/search-hotkey.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
-  import type { GlobalSearchManager, SearchMode } from '#lib/managers/global-search-manager.svelte.ts';
+  import type { GlobalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
   import { NAVIGATION_ITEMS, type NavigationItem } from '#lib/managers/navigation-items.ts';
   import ShortcutsModal from '#lib/modals/ShortcutsModal.svelte';
   import { getEntries, type RecentEntry } from '#lib/stores/cmdk-recent.ts';
@@ -542,9 +543,7 @@
       // by default (the @immich/ui shortcut action skips events whose target is an
       // input), so it won't fire while the palette's Command.Input is focused. Handle
       // the cycle here instead — same behavior, different listener.
-      const order: SearchMode[] = ['smart', 'metadata', 'description', 'ocr'];
-      const next = order[(order.indexOf(manager.mode) + 1) % order.length];
-      manager.setMode(next);
+      manager.setMode(nextSearchMode(manager.mode));
       e.preventDefault();
       return;
     }

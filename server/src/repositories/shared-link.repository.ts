@@ -20,7 +20,7 @@ import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { SharedLinkTable } from 'src/schema/tables/shared-link.table.js';
 import { anyUuid, dummy } from 'src/utils/database.js';
-import { asBaseEb, sharedLinkAssetIsServable } from 'src/utils/shared-link-space-tether.js';
+import { asBaseEb, sharedLinkAlbumIsServable, sharedLinkAssetIsServable } from 'src/utils/shared-link-space-tether.js';
 
 export type SharedLinkSearchOptions = {
   userId: string;
@@ -181,6 +181,7 @@ export class SharedLinkRepository {
     return this.authBuilder().where('shared_link.slug', '=', slug).executeTakeFirst();
   }
 
+  // gallery-fork (#1018): an album link made from a space lives only as long as its space tether
   private authBuilder() {
     return this.db
       .selectFrom('shared_link')
@@ -201,7 +202,8 @@ export class SharedLinkRepository {
           eb.selectFrom('user').select(columns.authUser).whereRef('user.id', '=', 'shared_link.userId'),
         ).as('user'),
       ])
-      .where((eb) => eb.or([eb('shared_link.type', '=', SharedLinkType.Individual), eb('album.id', 'is not', null)]));
+      .where((eb) => eb.or([eb('shared_link.type', '=', SharedLinkType.Individual), eb('album.id', 'is not', null)]))
+      .where((eb) => sharedLinkAlbumIsServable(asBaseEb(eb)));
   }
 
   async create(entity: Insertable<SharedLinkTable> & { assetIds?: string[]; spaceId?: string | null }) {

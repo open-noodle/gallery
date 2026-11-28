@@ -10,6 +10,7 @@
 # node i18n/gallery/merge.mjs --check fails on stale lines. See specs/2026-10-11-i18n-overlay-design.md.
 
 admin.download_csv en:a4023b89
+admin.face_detection_description exclusive
 admin.integrity_checks_untracked_files_description en:e12d9931
 admin.library_watching_settings en:b128b6ab
 admin.machine_learning_max_recognition_distance_description en:5db533fe

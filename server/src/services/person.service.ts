@@ -42,6 +42,7 @@ import {
 import { FaceIdentityMaintenanceService } from 'src/gallery/services/face-identity-maintenance.service.js';
 import { requireThumbnailAccess } from 'src/gallery/services/gallery-people.service.js';
 import { requireAssetEditAccess } from 'src/gallery/utils/access-grants.js';
+import { withOwnedPersonAssetCounts } from 'src/gallery/utils/owned-person-asset-counts.js';
 import { crossOwnerMergeAuthorizer, resolveMinimumFaceCount } from 'src/gallery/utils/people-config.js';
 import { updatePersonWithType } from 'src/gallery/utils/person-type.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
@@ -158,7 +159,11 @@ export class PersonService extends BaseService {
     });
 
     return {
-      people: items.map((person) => mapPerson(person)),
+      people: await withOwnedPersonAssetCounts(
+        this.galleryPersonRepository,
+        auth,
+        items.map((person) => mapPerson(person)),
+      ),
       hasNextPage,
       total,
       hidden,
@@ -1037,7 +1042,9 @@ export class PersonService extends BaseService {
   async createFace(auth: AuthDto, dto: AssetFaceCreateDto): Promise<void> {
     await Promise.all([
       requireAssetEditAccess(this.accessRepository, { auth, ids: [dto.assetId] }),
-      this.requireAccess({ auth, permission: Permission.PersonRead, ids: [dto.personId] }),
+      // Upstream requires the caller's own person. PersonRead also admits space members, which would let them write
+      // faces into another member's person; space people go through SharedSpaceService.createSpaceAssetFace.
+      this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [dto.personId] }),
     ]);
 
     const [asset, person] = await Promise.all([

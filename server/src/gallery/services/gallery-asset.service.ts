@@ -159,7 +159,10 @@ export class GalleryAssetService extends BaseService {
     await this.videoTrimRepository.upsert(id, dto.startTime, dto.endTime);
     // The trimmed thumbnails are the asset's edited ones, which clients request while isEdited is set.
     await this.assetRepository.update({ id, isEdited: true });
-    await this.jobRepository.queue({ name: JobName.AssetVideoTrimGenerate, data: { id } });
+    await this.jobRepository.queue({
+      name: JobName.AssetVideoTrimGenerate,
+      data: await this.assetEditJobData(auth, id),
+    });
     await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
 
     return { startTime: dto.startTime, endTime: dto.endTime, originalDuration: durationSeconds };
@@ -173,7 +176,10 @@ export class GalleryAssetService extends BaseService {
       await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
     }
     // The trim job removes the trimmed files and regenerates thumbnails; clients wait for its AssetEditReadyV2.
-    await this.jobRepository.queue({ name: JobName.AssetVideoTrimGenerate, data: { id } });
+    await this.jobRepository.queue({
+      name: JobName.AssetVideoTrimGenerate,
+      data: await this.assetEditJobData(auth, id),
+    });
   }
 
   async getAdjust(auth: AuthDto, id: string): Promise<AssetImageAdjustResponseDto> {
@@ -215,7 +221,10 @@ export class GalleryAssetService extends BaseService {
 
     const { exposure, contrast, saturation, invert } = dto;
     await this.imageAdjustRepository.upsert(id, { exposure, contrast, saturation, invert });
-    await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
+    await this.jobRepository.queue({
+      name: JobName.AssetEditThumbnailGeneration,
+      data: await this.assetEditJobData(auth, id),
+    });
     await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
 
     return { exposure, contrast, saturation, invert };
@@ -228,6 +237,9 @@ export class GalleryAssetService extends BaseService {
       await logCrossOwnerEdit(this.accessRepository, this.sharedSpaceRepository, this.logger, auth, [id]);
     }
     // The edit job removes or regenerates the edited files; clients wait for its AssetEditReadyV2.
-    await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
+    await this.jobRepository.queue({
+      name: JobName.AssetEditThumbnailGeneration,
+      data: await this.assetEditJobData(auth, id),
+    });
   }
 }

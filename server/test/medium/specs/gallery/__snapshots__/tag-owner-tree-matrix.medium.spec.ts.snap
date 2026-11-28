@@ -1,0 +1,48 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a tag put on a member's photo > outcome grid 1`] = `
+{
+  "admin non-member": {
+    "inPhotoMetadata": false,
+    "inPhotoOwnersTree": false,
+    "photoOwnersOwnTagSurvives": true,
+    "survivesExtraction": false,
+    "tagged": false,
+  },
+  "non-member": {
+    "inPhotoMetadata": false,
+    "inPhotoOwnersTree": false,
+    "photoOwnersOwnTagSurvives": true,
+    "survivesExtraction": false,
+    "tagged": false,
+  },
+  "photo owner": {
+    "inPhotoMetadata": true,
+    "inPhotoOwnersTree": true,
+    "photoOwnersOwnTagSurvives": true,
+    "survivesExtraction": true,
+    "tagged": true,
+  },
+  "space editor": {
+    "inPhotoMetadata": false,
+    "inPhotoOwnersTree": false,
+    "photoOwnersOwnTagSurvives": true,
+    "survivesExtraction": true,
+    "tagged": true,
+  },
+  "space owner": {
+    "inPhotoMetadata": false,
+    "inPhotoOwnersTree": false,
+    "photoOwnersOwnTagSurvives": true,
+    "survivesExtraction": true,
+    "tagged": true,
+  },
+  "space viewer": {
+    "inPhotoMetadata": false,
+    "inPhotoOwnersTree": false,
+    "photoOwnersOwnTagSurvives": true,
+    "survivesExtraction": false,
+    "tagged": false,
+  },
+}
+`;

@@ -1470,7 +1470,9 @@ export class AssetRepository {
             .selectFrom('tag')
             .select('tag.value')
             .innerJoin('tag_asset', 'tag.id', 'tag_asset.tagId')
-            .whereRef('asset.id', '=', 'tag_asset.assetId'),
+            .whereRef('asset.id', '=', 'tag_asset.assetId')
+            // gallery-fork (#992): a space editor's tag on a member's asset stays out of the owner's metadata
+            .whereRef('tag.userId', '=', 'asset.ownerId'),
         ).as('tags'),
       )
       .where('asset.id', '=', id)

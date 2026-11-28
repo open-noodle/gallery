@@ -1,3 +1,4 @@
+import { frameAroundFace } from '#lib/gallery/utils/face-frame.ts';
 import { flushSync } from 'svelte';
 import { expect } from 'vitest';
 import { cleanup, render } from 'vitest-browser-svelte';
@@ -49,12 +50,10 @@ describe('VideoFaceBox', () => {
       width: 1000,
       height: 562.5,
     });
-    expect(placementOf(page.getByTestId('video-face-box-face').element())).toEqual({
-      left: 100,
-      top: 112.5,
-      width: 200,
-      height: 168.75,
-    });
+    // The face spans (100, 112.5) to (300, 281.25) of the picture, and the box is the frame around it.
+    expect(placementOf(page.getByTestId('video-face-box-face').element())).toEqual(
+      frameAroundFace({ left: 100, top: 112.5, width: 200, height: 168.75 }),
+    );
   });
 
   it('goes when the sighting is cleared', async () => {

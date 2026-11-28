@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`changing the cover face of a person reachable through a linked album > outcome grid 1`] = `
+{
+  "admin non-member": {
+    "owner is a member": "refused: Not found or no person.read access",
+    "owner is not a member": "refused: Not found or no person.read access",
+  },
+  "non-member": {
+    "owner is a member": "refused: Not found or no person.read access",
+    "owner is not a member": "refused: Not found or no person.read access",
+  },
+  "person owner": {
+    "owner is a member": "changed",
+    "owner is not a member": "changed",
+  },
+  "space editor": {
+    "owner is a member": "changed",
+    "owner is not a member": "refused: Not authorized to change this person",
+  },
+  "space owner": {
+    "owner is a member": "changed",
+    "owner is not a member": "refused: Not authorized to change this person",
+  },
+  "space viewer": {
+    "owner is a member": "refused: Not authorized to change this person",
+    "owner is not a member": "refused: Not authorized to change this person",
+  },
+}
+`;
